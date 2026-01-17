@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SmartPot API Reference</title>
+</head>
+<body>
+    <h1>SmartPot API - Route Reference</h1>
+    
+    <p>
+        <label>API URL: <input type="text" id="apiUrl" value="http://localhost:8001" size="30"></label>
+    </p>
+
+    <hr>
+
+    <h2>GET /health</h2>
+    <button onclick="fetchHealth()">Fetch</button>
+    <pre id="healthResponse">--</pre>
+
+    <hr>
+
+    <h2>GET /plant</h2>
+    <button onclick="fetchPlant()">Fetch</button>
+    <pre id="plantResponse">--</pre>
+
+    <hr>
+
+    <h2>POST /water</h2>
+    <label>Duration (1-30 sec): <input type="number" id="duration" value="5" min="1" max="30"></label>
+    <button onclick="postWater()">Fetch</button>
+    <pre id="waterResponse">--</pre>
+
+    <script>
+        function getBaseUrl() {
+            return document.getElementById('apiUrl').value;
+        }
+
+        // GET /health
+        async function fetchHealth() {
+            try {
+                const res = await fetch(`${getBaseUrl()}/health`);
+                const data = await res.json();
+                document.getElementById('healthResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('healthResponse').textContent = `Error: ${err.message}`;
+            }
+        }
+
+        // GET /plant
+        async function fetchPlant() {
+            try {
+                const res = await fetch(`${getBaseUrl()}/plant`);
+                const data = await res.json();
+                document.getElementById('plantResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('plantResponse').textContent = `Error: ${err.message}`;
+            }
+        }
+
+        // POST /water
+        async function postWater() {
+            try {
+                const duration = parseInt(document.getElementById('duration').value, 10);
+                const res = await fetch(`${getBaseUrl()}/water`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration_seconds: duration })
+                });
+                const data = await res.json();
+                document.getElementById('waterResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('waterResponse').textContent = `Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
