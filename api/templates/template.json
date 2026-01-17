@@ -1,0 +1,14 @@
+{
+  "plant_info":{
+    "air":
+    {
+      "temperature":"23.5C",
+      "humidity":"65.2%",
+      "status":"optimal (optimal, moderate, bad)" 
+    },
+    "ground":{
+      "humidity":"69.5%",
+      "status":"optimal (dry, optimal)" 
+    }
+  }
+}
