@@ -4,8 +4,12 @@ Simple reference for API routes and responses.
 
 ## Setup
 
-1. Start the API: `./run.sh` (runs on port 8001)
+1. Start the API (from project root):
+   - **macOS/Linux:** `./run.sh`
+   - **Windows:** double-click `run.bat`
 2. Open `index.html` in browser
+
+API runs on port 8001 by default.
 
 ## Routes
 
