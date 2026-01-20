@@ -1,13 +1,15 @@
 """
-SmartPot Waterer API - Mock Mode
+SmartPot Waterer API
 
-This API serves mock data for frontend development.
-Arduino communications are disabled in this mode.
+Reads sensor data from JSON file (populated by arduino_daemon.py)
+Sends commands via command file (processed by arduino_daemon.py)
 """
 
 import os
-import random
+import json
+import time
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -35,7 +37,13 @@ load_dotenv()
 # ============================================================================
 
 API_VERSION = "1.0.0"
-MOCK_MODE = True  # Set to False when Arduino backend is ready
+MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
+
+# Data file paths
+SCRIPT_DIR = Path(__file__).parent.parent  # api/
+DATA_DIR = SCRIPT_DIR / "data"
+SENSOR_FILE = DATA_DIR / "sensor_data.json"
+COMMAND_FILE = DATA_DIR / "command.txt"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,33 +53,62 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# Mock Data Generation
+# Data Access Functions
 # ============================================================================
 
-def generate_mock_plant_data() -> PlantInfo:
-    """Generate realistic mock sensor data for frontend development."""
-    temp = round(random.uniform(18.0, 28.0), 1)
-    air_humidity = round(random.uniform(40.0, 70.0), 1)
-    ground_humidity = round(random.uniform(30.0, 80.0), 1)
+def read_sensor_data() -> dict | None:
+    """Read current sensor data from JSON file."""
+    if not SENSOR_FILE.exists():
+        return None
     
-    # Determine statuses based on values
-    if 18 <= temp <= 28 and 40 <= air_humidity <= 70:
-        air_status = AirStatus.OPTIMAL
-    elif 15 <= temp <= 32 and 30 <= air_humidity <= 80:
-        air_status = AirStatus.MODERATE
-    else:
-        air_status = AirStatus.BAD
+    try:
+        with open(SENSOR_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.error(f"Failed to read sensor data: {e}")
+        return None
+
+
+def send_command(command: str) -> bool:
+    """Write command to file for daemon to process."""
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(COMMAND_FILE, "w") as f:
+            f.write(command)
+        return True
+    except IOError as e:
+        logger.error(f"Failed to write command: {e}")
+        return False
+
+
+def build_plant_info(data: dict) -> PlantInfo:
+    """Convert raw sensor data to PlantInfo model."""
+    temp = data.get("temperature")
+    air_hum = data.get("air_humidity")
+    soil_hum = data.get("soil_humidity")
     
-    ground_status = GroundStatus.OPTIMAL if ground_humidity >= 40 else GroundStatus.DRY
+    # Map status strings to enums
+    air_status_map = {
+        "optimal": AirStatus.OPTIMAL,
+        "moderate": AirStatus.MODERATE,
+        "bad": AirStatus.BAD
+    }
+    ground_status_map = {
+        "optimal": GroundStatus.OPTIMAL,
+        "dry": GroundStatus.DRY
+    }
+    
+    air_status = air_status_map.get(data.get("air_status", ""), AirStatus.MODERATE)
+    ground_status = ground_status_map.get(data.get("ground_status", ""), GroundStatus.DRY)
     
     return PlantInfo(
         air=AirInfo(
-            temperature=f"{temp}C",
-            humidity=f"{air_humidity}%",
+            temperature=f"{temp}C" if temp is not None else "--C",
+            humidity=f"{air_hum}%" if air_hum is not None else "--%",
             status=air_status
         ),
         ground=GroundInfo(
-            humidity=f"{ground_humidity}%",
+            humidity=f"{soil_hum}%" if soil_hum is not None else "--%",
             status=ground_status
         )
     )
@@ -83,7 +120,7 @@ def generate_mock_plant_data() -> PlantInfo:
 
 app = FastAPI(
     title="SmartPot Waterer API",
-    description="API for monitoring and controlling your smart plant watering system. Currently running in MOCK mode for frontend development.",
+    description="API for monitoring and controlling your smart plant watering system.",
     version=API_VERSION,
 )
 
@@ -98,7 +135,7 @@ app.add_middleware(
 
 
 # ============================================================================
-# Exception Handlers - Standardized Error Responses
+# Exception Handlers
 # ============================================================================
 
 @app.exception_handler(RequestValidationError)
@@ -161,17 +198,16 @@ def error_response(code: str, message: str, details: str = None) -> APIResponse:
 
 @app.get("/health", response_model=APIResponse, tags=["System"])
 async def health_check():
-    """
-    Health check endpoint to verify API is running.
+    """Health check endpoint to verify API is running."""
+    sensor_data = read_sensor_data()
+    daemon_status = sensor_data.get("daemon_status", "unknown") if sensor_data else "no_data"
     
-    Returns service status, version, and current mode (mock/live).
-    """
     return success_response(
         HealthData(
             service="SmartPot API",
             version=API_VERSION,
-            mode="mock" if MOCK_MODE else "live"
-        ).model_dump()
+            mode="mock" if MOCK_MODE else "live",
+        ).model_dump() | {"daemon_status": daemon_status}
     )
 
 
@@ -180,21 +216,25 @@ async def get_plant_info():
     """
     Get current plant environment information from sensors.
     
-    In mock mode, returns randomized but realistic sensor data.
-    
-    Response includes:
-    - Air temperature and humidity with status (optimal/moderate/bad)
-    - Ground humidity with status (optimal/dry)
+    Reads from sensor_data.json (populated by arduino_daemon).
     """
-    if MOCK_MODE:
-        plant_data = generate_mock_plant_data()
-        logger.info(f"[MOCK] Returning plant data: temp={plant_data.air.temperature}")
-        return success_response({"plant_info": plant_data.model_dump()})
+    sensor_data = read_sensor_data()
     
-    # TODO: Implement real Arduino communication when ready
-    return error_response(
-        code="NOT_IMPLEMENTED",
-        message="Live sensor data not yet implemented"
+    if sensor_data and sensor_data.get("temperature") is not None:
+        plant_info = build_plant_info(sensor_data)
+        return success_response({
+            "plant_info": plant_info.model_dump(),
+            "last_updated": sensor_data.get("last_updated")
+        })
+    
+    # No data available
+    return JSONResponse(
+        status_code=503,
+        content=error_response(
+            code="NO_SENSOR_DATA",
+            message="Sensor data not available",
+            details="Arduino daemon may not be running or connected"
+        ).model_dump()
     )
 
 
@@ -203,10 +243,8 @@ async def trigger_watering(request: WateringRequest = WateringRequest()):
     """
     Manually trigger plant watering.
     
-    In mock mode, simulates a successful watering operation.
-    
-    Parameters:
-    - duration_seconds: How long to keep the water valve open (default: 5)
+    Sends 'go' command to Arduino via daemon.
+    For duration > 0, sends 'go' to open, waits, sends 'go' to close.
     """
     if request.duration_seconds < 1 or request.duration_seconds > 30:
         return JSONResponse(
@@ -218,20 +256,33 @@ async def trigger_watering(request: WateringRequest = WateringRequest()):
             ).model_dump()
         )
     
-    if MOCK_MODE:
-        logger.info(f"[MOCK] Watering triggered for {request.duration_seconds} seconds")
-        return success_response(
-            WateringData(
-                triggered=True,
-                duration_seconds=request.duration_seconds,
-                message=f"Watering simulated for {request.duration_seconds} seconds"
+    # Send "go" to open valve
+    if not send_command("go"):
+        return JSONResponse(
+            status_code=503,
+            content=error_response(
+                code="COMMAND_FAILED",
+                message="Failed to send command to Arduino"
             ).model_dump()
         )
     
-    # TODO: Implement real Arduino communication when ready
-    return error_response(
-        code="NOT_IMPLEMENTED",
-        message="Live watering control not yet implemented"
+    logger.info(f"Watering started for {request.duration_seconds} seconds")
+    
+    # Wait for duration
+    time.sleep(request.duration_seconds)
+    
+    # Send "go" again to close valve
+    if not send_command("go"):
+        logger.warning("Failed to send close command")
+    
+    logger.info("Watering completed")
+    
+    return success_response(
+        WateringData(
+            triggered=True,
+            duration_seconds=request.duration_seconds,
+            message=f"Watering completed for {request.duration_seconds} seconds"
+        ).model_dump()
     )
 
 
@@ -245,6 +296,7 @@ if __name__ == "__main__":
     logger.info("=" * 50)
     logger.info("SmartPot API Starting")
     logger.info(f"Mode: {'MOCK' if MOCK_MODE else 'LIVE'}")
+    logger.info(f"Sensor file: {SENSOR_FILE}")
     logger.info("=" * 50)
     
     uvicorn.run(

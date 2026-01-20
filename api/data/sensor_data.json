@@ -1,0 +1,11 @@
+{
+  "temperature": 21.7,
+  "air_humidity": 46.0,
+  "soil_humidity": 76,
+  "air_status": "optimal",
+  "ground_status": "optimal",
+  "last_updated": "2026-01-20T20:40:18.227732",
+  "daemon_status": "error",
+  "last_servo_action": "Servo: CLOSED",
+  "last_servo_time": "2026-01-20T20:35:28.692317"
+}
