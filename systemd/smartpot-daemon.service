@@ -1,0 +1,19 @@
+[Unit]
+Description=SmartPot Arduino Daemon
+After=network.target bluetooth.target rfcomm-hc05.service
+Requires=rfcomm-hc05.service
+
+[Service]
+Type=simple
+User=martin
+WorkingDirectory=/home/martin/SmartPot-Waterer
+ExecStart=/home/martin/SmartPot-Waterer/venv/bin/python -m api.src.arduino_daemon
+Restart=always
+RestartSec=5
+
+# Environment
+Environment=SERIAL_PORT=/dev/rfcomm0
+Environment=BAUD_RATE=9600
+
+[Install]
+WantedBy=multi-user.target

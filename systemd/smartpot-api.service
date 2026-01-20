@@ -1,0 +1,18 @@
+[Unit]
+Description=SmartPot API Server
+After=network.target smartpot-daemon.service
+
+[Service]
+Type=simple
+User=martin
+WorkingDirectory=/home/martin/SmartPot-Waterer
+ExecStart=/home/martin/SmartPot-Waterer/venv/bin/python -m uvicorn api.src.main:app --host 0.0.0.0 --port 8001
+Restart=always
+RestartSec=5
+
+# Environment
+Environment=API_ENV=prod
+Environment=API_PORT=8001
+
+[Install]
+WantedBy=multi-user.target
