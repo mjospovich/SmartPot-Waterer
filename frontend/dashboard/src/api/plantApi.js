@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8001";
+const API_URL = `${window.location.protocol}//${window.location.hostname}:8001`;
 
 async function handleResponse(res) {
   const json = await res.json();
