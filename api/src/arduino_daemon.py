@@ -91,15 +91,15 @@ def determine_statuses(data: dict) -> dict:
     soil_hum = data.get("soil_humidity", 0)
     
     # Air status
-    if 18 <= temp <= 28 and 40 <= air_hum <= 70:
+    if 18 <= temp <= 28 and 40 <= air_hum <= 75:
         data["air_status"] = "optimal"
-    elif 15 <= temp <= 32 and 30 <= air_hum <= 80:
+    elif 15 <= temp <= 32 and 25 <= air_hum <= 85:
         data["air_status"] = "moderate"
     else:
         data["air_status"] = "bad"
     
     # Ground status
-    data["ground_status"] = "optimal" if soil_hum >= 40 else "dry"
+    data["ground_status"] = "optimal" if soil_hum >= 50 else "dry"
     
     return data
 
