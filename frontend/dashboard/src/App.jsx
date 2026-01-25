@@ -29,7 +29,7 @@ export default function App() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 10000);
+    const id = setInterval(load, 30000);
     return () => clearInterval(id);
   }, []);
 
@@ -79,7 +79,7 @@ export default function App() {
         )}
 
         <div className="mt-6 text-center text-xs text-white/40">
-          Auto-refresh every 10s
+          Auto-refresh every 30s
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const QUICK_SELECT = [5, 10, 20];
+const QUICK_SELECT = [3, 5, 8];
 
 function WateringPanel({ onWater }) {
   const [duration, setDuration] = useState(5);
@@ -75,7 +75,7 @@ function WateringPanel({ onWater }) {
         <input
           type="range"
           min="1"
-          max="30"
+          max="10"
           value={duration}
           onChange={(e) => setDuration(Number(e.target.value))}
           disabled={isWatering}
